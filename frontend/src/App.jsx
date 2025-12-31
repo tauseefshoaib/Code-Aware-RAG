@@ -15,6 +15,7 @@ export default function App() {
   const [indexed, setIndexed] = useState(false);
   const [chat, setChat] = useState([]);
   const [asking, setAsking] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState(null);
 
   const ALLOWED = /\.(js|ts|jsx|tsx|py|java|go|json|md)$/i;
 
@@ -110,9 +111,22 @@ export default function App() {
           </div>
         )
       ) : (
-        <pre key={i} style={styles.botCode}>
-          {part.trim()}
-        </pre>
+        <div key={i} style={styles.codeBlock}>
+          <button
+            style={{
+              ...styles.copyBtn,
+              ...(copiedIndex === i ? styles.copyBtnActive : {}),
+            }}
+            onClick={() => {
+              navigator.clipboard.writeText(part.trim());
+              setCopiedIndex(i);
+              setTimeout(() => setCopiedIndex(null), 1500);
+            }}
+          >
+            {copiedIndex === i ? "Copied ✓" : "Copy"}
+          </button>
+          <pre style={styles.botCode}>{part.trim()}</pre>
+        </div>
       )
     );
   };
@@ -298,5 +312,28 @@ const styles = {
     overflowX: "auto",
     fontFamily: "JetBrains Mono, monospace",
     fontSize: 13,
+  },
+  codeBlock: {
+    position: "relative",
+    marginTop: 8,
+  },
+  copyBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    background: "#1f1f1f",
+    color: "#eaeaea",
+    border: "1px solid #333",
+    borderRadius: 4,
+    padding: "4px 8px",
+    fontSize: 12,
+    cursor: "pointer",
+    opacity: 0.8,
+  },
+  copyBtnActive: {
+    background: "#2e7d32",
+    borderColor: "#2e7d32",
+    color: "#fff",
+    opacity: 1,
   },
 };
