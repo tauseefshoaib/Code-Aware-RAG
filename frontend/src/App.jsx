@@ -158,6 +158,8 @@ export default function App() {
         <div style={styles.pickerRow}>
           <input
             style={styles.input}
+            onFocus={(e) => Object.assign(e.target.style, styles.inputFocus)}
+            onBlur={(e) => Object.assign(e.target.style, styles.input)}
             placeholder="GitHub repo URL"
             value={repoUrl}
             onChange={(e) => setRepoUrl(e.target.value)}
@@ -202,10 +204,18 @@ export default function App() {
         {/* Chat */}
         <textarea
           style={styles.textarea}
+          onFocus={(e) => Object.assign(e.target.style, styles.textareaFocus)}
+          onBlur={(e) => Object.assign(e.target.style, styles.textarea)}
           placeholder="Ask about the codebase…"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           disabled={!indexed || asking}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              askQuestion();
+            }
+          }}
         />
 
         <button
@@ -263,6 +273,8 @@ const styles = {
     border: "1px solid #2a2a2a",
     color: "#eaeaea",
     borderRadius: 6,
+    outline: "none",
+    transition: "border 0.15s ease, box-shadow 0.15s ease",
   },
   filePicker: {
     padding: "10px 14px",
@@ -304,6 +316,8 @@ const styles = {
     color: "#eaeaea",
     border: "1px solid #2a2a2a",
     borderRadius: 6,
+    outline: "none",
+    transition: "border 0.15s ease, box-shadow 0.15s ease",
   },
   chatContainer: {
     marginTop: 30,
@@ -357,5 +371,13 @@ const styles = {
     borderColor: "#2e7d32",
     color: "#fff",
     opacity: 1,
+  },
+  inputFocus: {
+    border: "1px solid #555",
+    boxShadow: "0 0 0 2px rgba(255,255,255,0.08)",
+  },
+  textareaFocus: {
+    border: "1px solid #555",
+    boxShadow: "0 0 0 2px rgba(255,255,255,0.08)",
   },
 };
