@@ -46,7 +46,8 @@ export default function App() {
         for (const file of files) {
           if (
             file.webkitRelativePath.includes("node_modules") ||
-            file.webkitRelativePath.includes(".git")
+            file.webkitRelativePath.includes(".git") ||
+            file.name === ".env"
           ) {
             continue;
           }
@@ -105,6 +106,30 @@ export default function App() {
     setLoading(false);
   };
 
+  const renderAnswer = (answer) => {
+    // Split by markdown code fences
+    const parts = answer.split(/```(?:\w+)?\n([\s\S]*?)```/g);
+    const elements = [];
+
+    for (let i = 0; i < parts.length; i++) {
+      if (i % 2 === 0 && parts[i].trim()) {
+        elements.push(
+          <div key={i} style={styles.botText}>
+            {parts[i].trim()}
+          </div>
+        );
+      } else if (i % 2 === 1 && parts[i].trim()) {
+        elements.push(
+          <pre key={i} style={styles.botCode}>
+            {parts[i].trim()}
+          </pre>
+        );
+      }
+    }
+
+    return elements;
+  };
+
   return (
     <div style={styles.container}>
       <h1>🧠 CodeHelper</h1>
@@ -155,7 +180,7 @@ export default function App() {
         {chat.map((item, idx) => (
           <div key={idx} style={styles.chatItem}>
             <div style={styles.userQuestion}>❓ {item.question}</div>
-            <div style={styles.botAnswer}>💡 {item.answer}</div>
+            <div>{renderAnswer(item.answer)}</div>
           </div>
         ))}
       </div>
@@ -192,12 +217,18 @@ const styles = {
   userQuestion: {
     fontWeight: "bold",
   },
-  botAnswer: {
+  botText: {
+    marginTop: 5,
+    lineHeight: 1.5,
+  },
+  botCode: {
     background: "#111",
     color: "#0f0",
-    padding: 8,
+    padding: 10,
     marginTop: 5,
-    whiteSpace: "pre-wrap",
+    whiteSpace: "pre",
     borderRadius: 5,
+    overflowX: "auto",
+    fontFamily: "monospace",
   },
 };

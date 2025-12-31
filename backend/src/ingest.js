@@ -8,11 +8,19 @@ import { qdrant, COLLECTION } from "./qdrant.js";
 
 const ALLOWED_EXTENSIONS = /\.(js|ts|jsx|tsx|py|java|go|md|css|html)$/i;
 
+// Helper to skip ignored files/folders
+function shouldIgnore(filePath) {
+  return (
+    filePath.includes("/.git/") ||
+    filePath.includes("/node_modules/") ||
+    filePath.endsWith(".env") ||
+    filePath.endsWith("/uploads/")
+  );
+}
+
 export async function ingestRepo(input) {
   let files = await loadRepo(input);
-  files = files.filter(
-    (f) => ALLOWED_EXTENSIONS.test(f) && !f.includes("/.git/")
-  );
+  files = files.filter((f) => ALLOWED_EXTENSIONS.test(f) && !shouldIgnore(f));
 
   for (const file of files) {
     const chunks = chunkFile(file);
@@ -30,9 +38,10 @@ export async function ingestRepo(input) {
 
 // For local uploaded files
 export async function ingestFile(filePath, repoPath) {
+  if (shouldIgnore(filePath)) return;
   const content = fs.readFileSync(filePath, "utf8");
 
-  if (!content.trim()) return; // skip empty files
+  if (!content.trim()) return;
 
   const chunks = chunkContent(content, repoPath);
   const points = [];
