@@ -13,29 +13,25 @@ export default function App() {
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
   const [indexed, setIndexed] = useState(false);
-
-  // Chat history
   const [chat, setChat] = useState([]);
 
-  // Only index source files
   const ALLOWED = /\.(js|ts|jsx|tsx|py|java|go|json|md)$/i;
 
   const handleFolderPick = (e) => {
-    const selected = Array.from(e.target.files || []);
-    setFiles(selected);
+    setFiles(Array.from(e.target.files || []));
   };
 
   const ingestRepo = async () => {
     setLoading(true);
     setIndexed(false);
-    setChat([]); // reset chat on new ingestion
+    setChat([]);
 
     try {
       if (repoUrl.trim()) {
         await api.post("/ingest", { repoUrl });
       } else {
-        if (files.length === 0) {
-          alert("Please pick a repo folder");
+        if (!files.length) {
+          alert("Pick a repo folder");
           setLoading(false);
           return;
         }
@@ -58,21 +54,17 @@ export default function App() {
           }
         }
 
-        if (added === 0) {
+        if (!added) {
           alert("No valid source files found");
           setLoading(false);
           return;
         }
 
-        await api.post("/ingest-local", formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        });
+        await api.post("/ingest-local", formData);
       }
 
       setIndexed(true);
-      alert("✅ Repo indexed successfully");
+      alert("✅ Repo indexed");
     } catch (err) {
       console.error(err);
       alert("❌ Indexing failed");
@@ -82,22 +74,14 @@ export default function App() {
   };
 
   const askQuestion = async () => {
-    if (!indexed) {
-      alert("Index a repo first");
-      return;
-    }
-
-    if (!question.trim()) return;
+    if (!indexed || !question.trim()) return;
 
     setLoading(true);
 
     try {
       const res = await api.post("/chat", { question });
-      const answer = res.data.answer;
-
-      // Append to chat history
-      setChat((prev) => [...prev, { question, answer }]);
-      setQuestion(""); // clear input
+      setChat((c) => [...c, { question, answer: res.data.answer }]);
+      setQuestion("");
     } catch (err) {
       console.error(err);
       alert("❌ Question failed");
@@ -107,128 +91,182 @@ export default function App() {
   };
 
   const renderAnswer = (answer) => {
-    // Split by markdown code fences
     const parts = answer.split(/```(?:\w+)?\n([\s\S]*?)```/g);
-    const elements = [];
 
-    for (let i = 0; i < parts.length; i++) {
-      if (i % 2 === 0 && parts[i].trim()) {
-        elements.push(
+    return parts.map((part, i) =>
+      i % 2 === 0 ? (
+        part.trim() && (
           <div key={i} style={styles.botText}>
-            {parts[i].trim()}
+            {part.trim()}
           </div>
-        );
-      } else if (i % 2 === 1 && parts[i].trim()) {
-        elements.push(
-          <pre key={i} style={styles.botCode}>
-            {parts[i].trim()}
-          </pre>
-        );
-      }
-    }
-
-    return elements;
+        )
+      ) : (
+        <pre key={i} style={styles.botCode}>
+          {part.trim()}
+        </pre>
+      )
+    );
   };
 
   return (
-    <div style={styles.container}>
-      <h1>🧠 CodeHelper</h1>
+    <div style={styles.page}>
+      <div style={styles.container}>
+        <h1 style={styles.title}>Code Helper</h1>
 
-      {/* GitHub URL */}
-      <input
-        style={styles.input}
-        placeholder="GitHub public repo URL (optional)"
-        value={repoUrl}
-        onChange={(e) => setRepoUrl(e.target.value)}
-      />
+        {/* Inline Pickers */}
+        <div style={styles.pickerRow}>
+          <input
+            style={styles.input}
+            placeholder="GitHub repo URL"
+            value={repoUrl}
+            onChange={(e) => setRepoUrl(e.target.value)}
+          />
 
-      <p>— OR —</p>
+          <label style={styles.filePicker}>
+            Local Repo
+            <input
+              type="file"
+              webkitdirectory="true"
+              directory="true"
+              multiple
+              hidden
+              onChange={handleFolderPick}
+            />
+          </label>
+        </div>
 
-      {/* Folder Picker */}
-      <input
-        type="file"
-        webkitdirectory="true"
-        directory="true"
-        multiple
-        onChange={handleFolderPick}
-      />
+        <button
+          style={styles.primaryBtn}
+          onClick={ingestRepo}
+          disabled={loading}
+        >
+          {loading ? "Indexing…" : "Ingest Repo"}
+        </button>
 
-      <br />
-      <br />
+        <div style={styles.divider} />
 
-      <button onClick={ingestRepo} disabled={loading}>
-        {loading ? "Indexing..." : "Ingest Repo"}
-      </button>
+        {/* Chat */}
+        <textarea
+          style={styles.textarea}
+          placeholder="Ask about the codebase…"
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+        />
 
-      <hr />
+        <button
+          style={styles.secondaryBtn}
+          onClick={askQuestion}
+          disabled={loading}
+        >
+          Ask
+        </button>
 
-      {/* Chat input */}
-      <textarea
-        style={styles.textarea}
-        placeholder="Ask something like: where is the addition method?"
-        value={question}
-        onChange={(e) => setQuestion(e.target.value)}
-      />
-
-      <br />
-      <button onClick={askQuestion} disabled={loading}>
-        {loading ? "Thinking..." : "Ask"}
-      </button>
-
-      {/* Chat view */}
-      <div style={styles.chatContainer}>
-        {chat.map((item, idx) => (
-          <div key={idx} style={styles.chatItem}>
-            <div style={styles.userQuestion}>❓ {item.question}</div>
-            <div>{renderAnswer(item.answer)}</div>
-          </div>
-        ))}
+        <div style={styles.chatContainer}>
+          {chat.map((c, i) => (
+            <div key={i} style={styles.chatItem}>
+              <div style={styles.userQuestion}>❯ {c.question}</div>
+              {renderAnswer(c.answer)}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
+/* ================= STYLES ================= */
+
 const styles = {
+  page: {
+    background: "#0f0f0f",
+    minHeight: "100vh",
+    padding: "40px 20px",
+    color: "#eaeaea",
+  },
   container: {
-    maxWidth: 800,
-    margin: "40px auto",
-    fontFamily: "sans-serif",
+    maxWidth: 900,
+    margin: "0 auto",
+    fontFamily: "Inter, system-ui, sans-serif",
+  },
+  title: {
+    marginBottom: 30,
+    fontWeight: 600,
+    letterSpacing: "-0.5px",
+  },
+  pickerRow: {
+    display: "flex",
+    gap: 12,
+    marginBottom: 15,
   },
   input: {
-    width: "100%",
-    padding: 8,
-    marginBottom: 10,
+    flex: 1,
+    padding: 10,
+    background: "#161616",
+    border: "1px solid #2a2a2a",
+    color: "#eaeaea",
+    borderRadius: 6,
+  },
+  filePicker: {
+    padding: "10px 14px",
+    background: "#161616",
+    border: "1px dashed #444",
+    borderRadius: 6,
+    cursor: "pointer",
+    fontSize: 14,
+  },
+  primaryBtn: {
+    padding: "10px 16px",
+    background: "#eaeaea",
+    color: "#000",
+    border: "none",
+    borderRadius: 6,
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  secondaryBtn: {
+    marginTop: 10,
+    padding: "8px 14px",
+    background: "#1f1f1f",
+    color: "#eaeaea",
+    border: "1px solid #333",
+    borderRadius: 6,
+    cursor: "pointer",
+  },
+  divider: {
+    margin: "30px 0",
   },
   textarea: {
     width: "100%",
     height: 80,
-    padding: 8,
+    padding: 10,
+    background: "#161616",
+    color: "#eaeaea",
+    border: "1px solid #2a2a2a",
+    borderRadius: 6,
   },
   chatContainer: {
-    marginTop: 20,
-    borderTop: "1px solid #ccc",
-    paddingTop: 10,
-    maxHeight: 400,
-    overflowY: "auto",
+    marginTop: 30,
   },
   chatItem: {
-    marginBottom: 15,
+    marginBottom: 24,
   },
   userQuestion: {
-    fontWeight: "bold",
+    fontWeight: 500,
+    marginBottom: 6,
   },
   botText: {
-    marginTop: 5,
-    lineHeight: 1.5,
+    lineHeight: 1.6,
+    color: "#d0d0d0",
   },
   botCode: {
-    background: "#111",
-    color: "#0f0",
-    padding: 10,
-    marginTop: 5,
+    background: "#050505",
+    border: "1px solid #222",
+    padding: 12,
+    marginTop: 6,
+    borderRadius: 6,
     whiteSpace: "pre",
-    borderRadius: 5,
     overflowX: "auto",
-    fontFamily: "monospace",
+    fontFamily: "JetBrains Mono, monospace",
+    fontSize: 13,
   },
 };
