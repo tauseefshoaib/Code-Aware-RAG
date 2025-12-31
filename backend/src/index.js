@@ -3,7 +3,7 @@ import cors from "cors";
 import multer from "multer";
 
 import { initCollection } from "./qdrant.js";
-import { chat } from "./chat.js";
+import { streamChat } from "./chat.js";
 import { ingestFile, ingestRepo } from "./ingest.js";
 
 const app = express();
@@ -57,11 +57,13 @@ app.post("/ingest-local", upload.array("files"), async (req, res) => {
  */
 app.post("/chat", async (req, res) => {
   try {
-    const answer = await chat(req.body.question);
-    res.json({ answer });
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+
+    await streamChat(req.body.question, res);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.end("\n❌ Error generating answer");
   }
 });
 

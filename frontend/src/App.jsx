@@ -78,16 +78,34 @@ export default function App() {
     setAsking(true);
 
     // optimistic UI
-    setChat((c) => [...c, { question: q, answer: null }]);
+    setChat((c) => [...c, { question: q, answer: "" }]);
 
     try {
-      const res = await api.post("/chat", { question: q });
+      const res = await fetch(`${API}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q }),
+      });
 
-      setChat((c) =>
-        c.map((item, i) =>
-          i === c.length - 1 ? { ...item, answer: res.data.answer } : item
-        )
-      );
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      let done = false;
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+
+        const chunk = decoder.decode(value || new Uint8Array(), {
+          stream: !done,
+        });
+
+        setChat((c) =>
+          c.map((item, i) =>
+            i === c.length - 1 ? { ...item, answer: item.answer + chunk } : item
+          )
+        );
+      }
     } catch (err) {
       console.error(err);
       alert("❌ Question failed");
