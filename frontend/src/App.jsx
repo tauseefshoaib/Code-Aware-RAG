@@ -14,6 +14,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [indexed, setIndexed] = useState(false);
   const [chat, setChat] = useState([]);
+  const [asking, setAsking] = useState(false);
 
   const ALLOWED = /\.(js|ts|jsx|tsx|py|java|go|json|md)$/i;
 
@@ -21,7 +22,22 @@ export default function App() {
     setFiles(Array.from(e.target.files || []));
   };
 
+  const validFiles = files.filter(
+    (f) =>
+      !f.webkitRelativePath.includes("node_modules") &&
+      !f.webkitRelativePath.includes(".git") &&
+      f.name !== ".env" &&
+      ALLOWED.test(f.name)
+  );
+
+  const repoName =
+    files.length > 0 ? files[0].webkitRelativePath.split("/")[0] : null;
+
+  const canIngest = !loading && (repoUrl.trim().length > 0 || files.length > 0);
+
   const ingestRepo = async () => {
+    if (!canIngest) return;
+
     setLoading(true);
     setIndexed(false);
     setChat([]);
@@ -30,33 +46,14 @@ export default function App() {
       if (repoUrl.trim()) {
         await api.post("/ingest", { repoUrl });
       } else {
-        if (!files.length) {
-          alert("Pick a repo folder");
-          setLoading(false);
-          return;
-        }
-
         const formData = new FormData();
-        let added = 0;
 
-        for (const file of files) {
-          if (
-            file.webkitRelativePath.includes("node_modules") ||
-            file.webkitRelativePath.includes(".git") ||
-            file.name === ".env"
-          ) {
-            continue;
-          }
-
-          if (ALLOWED.test(file.name)) {
-            formData.append("files", file, file.webkitRelativePath);
-            added++;
-          }
+        for (const file of validFiles) {
+          formData.append("files", file, file.webkitRelativePath);
         }
 
-        if (!added) {
+        if (!validFiles.length) {
           alert("No valid source files found");
-          setLoading(false);
           return;
         }
 
@@ -64,33 +61,45 @@ export default function App() {
       }
 
       setIndexed(true);
-      alert("✅ Repo indexed");
     } catch (err) {
       console.error(err);
       alert("❌ Indexing failed");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const askQuestion = async () => {
-    if (!indexed || !question.trim()) return;
+    if (!indexed || !question.trim() || asking) return;
 
-    setLoading(true);
+    const q = question;
+    setQuestion("");
+    setAsking(true);
+
+    // optimistic UI
+    setChat((c) => [...c, { question: q, answer: null }]);
 
     try {
-      const res = await api.post("/chat", { question });
-      setChat((c) => [...c, { question, answer: res.data.answer }]);
-      setQuestion("");
+      const res = await api.post("/chat", { question: q });
+
+      setChat((c) =>
+        c.map((item, i) =>
+          i === c.length - 1 ? { ...item, answer: res.data.answer } : item
+        )
+      );
     } catch (err) {
       console.error(err);
       alert("❌ Question failed");
+    } finally {
+      setAsking(false);
     }
-
-    setLoading(false);
   };
 
   const renderAnswer = (answer) => {
+    if (!answer) {
+      return <div style={styles.thinking}>🤖 Thinking…</div>;
+    }
+
     const parts = answer.split(/```(?:\w+)?\n([\s\S]*?)```/g);
 
     return parts.map((part, i) =>
@@ -120,6 +129,7 @@ export default function App() {
             placeholder="GitHub repo URL"
             value={repoUrl}
             onChange={(e) => setRepoUrl(e.target.value)}
+            disabled={loading}
           />
 
           <label style={styles.filePicker}>
@@ -130,17 +140,29 @@ export default function App() {
               directory="true"
               multiple
               hidden
+              disabled={loading}
               onChange={handleFolderPick}
             />
           </label>
         </div>
 
+        {files.length > 0 && (
+          <div style={styles.repoInfo}>
+            📁 <strong>{repoName}</strong> · {files.length} files ·{" "}
+            {validFiles.length} indexed
+          </div>
+        )}
+
         <button
-          style={styles.primaryBtn}
+          style={{
+            ...styles.primaryBtn,
+            opacity: canIngest ? 1 : 0.5,
+            cursor: canIngest ? "pointer" : "not-allowed",
+          }}
           onClick={ingestRepo}
-          disabled={loading}
+          disabled={!canIngest}
         >
-          {loading ? "Indexing…" : "Ingest Repo"}
+          {loading ? "Indexing repository…" : "Ingest Repo"}
         </button>
 
         <div style={styles.divider} />
@@ -151,14 +173,15 @@ export default function App() {
           placeholder="Ask about the codebase…"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
+          disabled={!indexed || asking}
         />
 
         <button
           style={styles.secondaryBtn}
           onClick={askQuestion}
-          disabled={loading}
+          disabled={!indexed || asking}
         >
-          Ask
+          {asking ? "Thinking…" : "Ask"}
         </button>
 
         <div style={styles.chatContainer}>
@@ -191,12 +214,11 @@ const styles = {
   title: {
     marginBottom: 30,
     fontWeight: 600,
-    letterSpacing: "-0.5px",
   },
   pickerRow: {
     display: "flex",
     gap: 12,
-    marginBottom: 15,
+    marginBottom: 10,
   },
   input: {
     flex: 1,
@@ -214,6 +236,11 @@ const styles = {
     cursor: "pointer",
     fontSize: 14,
   },
+  repoInfo: {
+    fontSize: 13,
+    color: "#aaa",
+    marginBottom: 12,
+  },
   primaryBtn: {
     padding: "10px 16px",
     background: "#eaeaea",
@@ -221,7 +248,6 @@ const styles = {
     border: "none",
     borderRadius: 6,
     fontWeight: 500,
-    cursor: "pointer",
   },
   secondaryBtn: {
     marginTop: 10,
@@ -230,7 +256,6 @@ const styles = {
     color: "#eaeaea",
     border: "1px solid #333",
     borderRadius: 6,
-    cursor: "pointer",
   },
   divider: {
     margin: "30px 0",
@@ -257,6 +282,11 @@ const styles = {
   botText: {
     lineHeight: 1.6,
     color: "#d0d0d0",
+  },
+  thinking: {
+    color: "#888",
+    fontStyle: "italic",
+    marginTop: 4,
   },
   botCode: {
     background: "#050505",
