@@ -212,6 +212,7 @@ export default function App() {
           style={{
             ...styles.secondaryBtn,
             cursor: indexed && !asking ? "pointer" : "not-allowed",
+            opacity: indexed && !asking ? 1 : 0.5,
           }}
           onClick={askQuestion}
           disabled={!indexed || asking}
