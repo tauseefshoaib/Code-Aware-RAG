@@ -11,9 +11,11 @@ export default function App() {
   const [repoUrl, setRepoUrl] = useState("");
   const [files, setFiles] = useState([]);
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [indexed, setIndexed] = useState(false);
+
+  // Chat history
+  const [chat, setChat] = useState([]);
 
   // Only index source files
   const ALLOWED = /\.(js|ts|jsx|tsx|py|java|go|json|md)$/i;
@@ -21,21 +23,17 @@ export default function App() {
   const handleFolderPick = (e) => {
     const selected = Array.from(e.target.files || []);
     setFiles(selected);
-    console.log("Selected files:", selected.length);
   };
 
   const ingestRepo = async () => {
     setLoading(true);
     setIndexed(false);
+    setChat([]); // reset chat on new ingestion
 
     try {
-      // ===== GitHub Repo =====
       if (repoUrl.trim()) {
         await api.post("/ingest", { repoUrl });
-      }
-
-      // ===== Local Repo =====
-      else {
+      } else {
         if (files.length === 0) {
           alert("Please pick a repo folder");
           setLoading(false);
@@ -43,11 +41,9 @@ export default function App() {
         }
 
         const formData = new FormData();
-
         let added = 0;
 
         for (const file of files) {
-          // Skip heavy folders
           if (
             file.webkitRelativePath.includes("node_modules") ||
             file.webkitRelativePath.includes(".git")
@@ -90,12 +86,17 @@ export default function App() {
       return;
     }
 
+    if (!question.trim()) return;
+
     setLoading(true);
-    setAnswer("");
 
     try {
       const res = await api.post("/chat", { question });
-      setAnswer(res.data.answer);
+      const answer = res.data.answer;
+
+      // Append to chat history
+      setChat((prev) => [...prev, { question, answer }]);
+      setQuestion(""); // clear input
     } catch (err) {
       console.error(err);
       alert("❌ Question failed");
@@ -136,7 +137,7 @@ export default function App() {
 
       <hr />
 
-      {/* Chat */}
+      {/* Chat input */}
       <textarea
         style={styles.textarea}
         placeholder="Ask something like: where is the addition method?"
@@ -145,13 +146,19 @@ export default function App() {
       />
 
       <br />
-
       <button onClick={askQuestion} disabled={loading}>
-        Ask
+        {loading ? "Thinking..." : "Ask"}
       </button>
 
-      {/* Answer */}
-      {answer && <pre style={styles.answer}>{answer}</pre>}
+      {/* Chat view */}
+      <div style={styles.chatContainer}>
+        {chat.map((item, idx) => (
+          <div key={idx} style={styles.chatItem}>
+            <div style={styles.userQuestion}>❓ {item.question}</div>
+            <div style={styles.botAnswer}>💡 {item.answer}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -169,14 +176,28 @@ const styles = {
   },
   textarea: {
     width: "100%",
-    height: 100,
+    height: 80,
     padding: 8,
   },
-  answer: {
+  chatContainer: {
     marginTop: 20,
+    borderTop: "1px solid #ccc",
+    paddingTop: 10,
+    maxHeight: 400,
+    overflowY: "auto",
+  },
+  chatItem: {
+    marginBottom: 15,
+  },
+  userQuestion: {
+    fontWeight: "bold",
+  },
+  botAnswer: {
     background: "#111",
     color: "#0f0",
-    padding: 15,
+    padding: 8,
+    marginTop: 5,
     whiteSpace: "pre-wrap",
+    borderRadius: 5,
   },
 };

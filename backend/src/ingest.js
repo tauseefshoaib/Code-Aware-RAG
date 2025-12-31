@@ -9,14 +9,10 @@ import { qdrant, COLLECTION } from "./qdrant.js";
 const ALLOWED_EXTENSIONS = /\.(js|ts|jsx|tsx|py|java|go|md|css|html)$/i;
 
 export async function ingestRepo(input) {
-  console.log("files", input);
-
   let files = await loadRepo(input);
   files = files.filter(
     (f) => ALLOWED_EXTENSIONS.test(f) && !f.includes("/.git/")
   );
-
-  console.log("filtered files", files);
 
   for (const file of files) {
     const chunks = chunkFile(file);
@@ -35,7 +31,6 @@ export async function ingestRepo(input) {
 // For local uploaded files
 export async function ingestFile(filePath, repoPath) {
   const content = fs.readFileSync(filePath, "utf8");
-  console.log("files", content);
 
   if (!content.trim()) return; // skip empty files
 
