@@ -28,7 +28,7 @@ export async function initSemanticCache(vectorSize = 768) {
  * Check if a cached answer exists for the given query vector
  * Returns the cached answer if similarity >= threshold
  */
-export async function getCachedAnswer(queryVector, threshold = 0.93) {
+export async function getCachedAnswer(queryVector, threshold = 0.6) {
   const results = await qdrant.search(SEMANTIC_CACHE, {
     vector: queryVector,
     limit: 1,
