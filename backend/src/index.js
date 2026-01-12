@@ -5,6 +5,7 @@ import multer from "multer";
 import { initCollection } from "./qdrant.js";
 import { streamChat } from "./chat.js";
 import { ingestFile, ingestRepo } from "./ingest.js";
+import { initSemanticCache } from "./semanticCache.js";
 
 const app = express();
 const upload = multer({
@@ -17,6 +18,7 @@ app.use(cors());
 app.use(express.json());
 
 await initCollection();
+await initSemanticCache();
 
 /**
  * GitHub repo ingestion
