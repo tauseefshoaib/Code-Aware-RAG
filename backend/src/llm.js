@@ -5,7 +5,7 @@ export async function* generateStream(prompt) {
   const response = await ollama.post(
     "/api/generate",
     {
-      model: "llama3.2",
+      model: "llama3.2:3b",
       prompt,
       stream: true,
     },
