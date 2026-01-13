@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { chunkContent } from "./chunker.js";
 import { generateStream } from "./llm.js";
+import { getPRBaseBranch } from "./github.js";
 
 export async function streamPRReview(prUrl, res) {
   console.log("🟢 Received PR URL:", prUrl);
@@ -16,6 +17,7 @@ export async function streamPRReview(prUrl, res) {
   }
 
   const [_, repoPath, prNumber] = match;
+  const [owner, repo] = repoPath.split("/");
   const repoUrl = `https://github.com/${repoPath}.git`;
   const localPath = path.join("repos", repoPath.replace("/", "_"));
 
@@ -25,25 +27,34 @@ export async function streamPRReview(prUrl, res) {
     await git.clone(repoUrl, localPath);
   }
 
-   // 3️⃣ Fetch PR into a remote ref (no branch checkout)
+  // 3️⃣ Get PR base branch from GitHub
+  const baseBranch = await getPRBaseBranch(owner, repo, prNumber);
+  console.log("🔵 PR base branch:", baseBranch);
+
+   // 4️⃣ Fetch PR head safely (NO checkout)
   const prRemoteRef = `refs/pull/${prNumber}/head`;
   const prLocalRef = `refs/remotes/origin/pr/${prNumber}`;
-
   await git.cwd(localPath).fetch("origin", `${prRemoteRef}:${prLocalRef}`);
 
-  // 4️⃣ Get diff against main
-  const diff = await git.diff([`origin/main..origin/pr/${prNumber}`]);
+  // 5️⃣ Fetch base branch explicitly
+  await git.cwd(localPath).fetch("origin", baseBranch);
 
-  if (!diff) {
+  // 6️⃣ Correct diff: base → PR
+  const diff = await git.diff([
+    `origin/${baseBranch}..origin/pr/${prNumber}`,
+  ]);
+
+   if (!diff) {
     res.end("No changes found in PR");
     return;
   }
 
-  // 5️⃣ Chunk diff by file
-  const fileDiffs = diff.split("diff --git").slice(1); // skip first empty
+  // 7️⃣ Chunk diff by file
+  const fileDiffs = diff.split("diff --git").slice(1);
   let context = "";
+
   for (const fd of fileDiffs) {
-    const lines = fd.split("\n").slice(4); // skip diff headers
+    const lines = fd.split("\n").slice(4);
     const filePathMatch = fd.match(/b\/(.+)/);
     if (!filePathMatch) continue;
 
