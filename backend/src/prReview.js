@@ -31,7 +31,7 @@ export async function streamPRReview(prUrl, res) {
   const baseBranch = await getPRBaseBranch(owner, repo, prNumber);
   console.log("🔵 PR base branch:", baseBranch);
 
-   // 4️⃣ Fetch PR head safely (NO checkout)
+  // 4️⃣ Fetch PR head safely (NO checkout)
   const prRemoteRef = `refs/pull/${prNumber}/head`;
   const prLocalRef = `refs/remotes/origin/pr/${prNumber}`;
   await git.cwd(localPath).fetch("origin", `${prRemoteRef}:${prLocalRef}`);
@@ -44,7 +44,7 @@ export async function streamPRReview(prUrl, res) {
     `origin/${baseBranch}..origin/pr/${prNumber}`,
   ]);
 
-   if (!diff) {
+  if (!diff) {
     res.end("No changes found in PR");
     return;
   }
@@ -75,16 +75,47 @@ ${c.code}`
 
   // 6️⃣ LLM prompt
   const prompt = `
-You are a senior software engineer.
-Review the following Pull Request changes.
-Provide these along with the relevant code block diff:
-- Bugs
-- Security issues
-- Performance issues
-- Suggestions
-Mention file path and line numbers.
+You are a senior software engineer reviewing a Pull Request.
 
-Code Changes:
+You MUST base your review ONLY on the provided git diff.
+Do NOT make assumptions about code outside the diff.
+
+STRICT RULES:
+- Do NOT speculate or guess
+- Do NOT invent bugs, security issues, or performance problems
+- Do NOT suggest architectural changes, refactors, or new technologies
+- Do NOT comment on coding style or naming unless it causes a real bug
+- Do NOT mention best practices unless the diff clearly violates them
+- If something is unclear or not visible in the diff, DO NOT mention it
+
+ALLOWED ISSUE TYPES (ONLY if clearly visible in the diff):
+- Bug (incorrect logic, runtime error, broken behavior)
+- Missing or incorrect error handling
+- Incorrect API or library usage
+- Clear performance issue directly caused by the change
+
+SECURITY RULE:
+Only report a security issue if there is a clear, concrete exploit path visible in the diff.
+Do NOT report hypothetical or generic security risks.
+
+RESPONSE FORMAT (MANDATORY):
+For each issue, use EXACTLY this structure:
+
+Category: Bug | Security | Performance | Suggestion
+File: <file path>
+Lines: <start>-<end>
+Problem: <concise, concrete explanation>
+Fix: <specific and minimal fix>
+
+IMPORTANT:
+- Every issue MUST include a file path and line numbers
+- Do NOT repeat the diff verbatim
+- Keep explanations short and technical
+
+If NO real issues are found, respond with EXACTLY:
+"✅ No issues found in this pull request."
+
+Here is the git diff to review:
 ${context}
 `;
 
