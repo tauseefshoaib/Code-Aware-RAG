@@ -6,6 +6,7 @@ import { initCollection } from "./qdrant.js";
 import { streamChat } from "./chat.js";
 import { ingestFile, ingestRepo } from "./ingest.js";
 import { initSemanticCache } from "./semanticCache.js";
+import { streamPRReview } from "./prReview.js";
 
 const app = express();
 const upload = multer({
@@ -66,6 +67,19 @@ app.post("/chat", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.end("\n❌ Error generating answer");
+  }
+});
+
+/**
+ * PR Review
+ */
+app.post("/pr-review", async (req, res) => {
+  try {
+    const { prUrl } = req.body;
+    await streamPRReview(prUrl, res);
+  } catch (err) {
+    console.error(err);
+    res.status(500).end("❌ PR review failed");
   }
 });
 

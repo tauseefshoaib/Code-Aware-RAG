@@ -16,6 +16,9 @@ export default function App() {
   const [chat, setChat] = useState([]);
   const [asking, setAsking] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [prUrl, setPrUrl] = useState("");
+  const [prReview, setPrReview] = useState("");
+  const [reviewing, setReviewing] = useState(false);
 
   const ALLOWED = /\.(js|ts|jsx|tsx|py|java|go|json|md)$/i;
 
@@ -149,6 +152,37 @@ export default function App() {
     );
   };
 
+  // PR review function
+  const reviewPR = async () => {
+    if (!prUrl.trim() || reviewing) return;
+    setPrReview("");
+    setReviewing(true);
+
+    try {
+      const res = await fetch(`${API}/pr-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prUrl }),
+      });
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+
+      while (!done) {
+        const { value, done: doneReading } = await reader.read();
+        done = doneReading;
+        const chunk = decoder.decode(value || new Uint8Array(), { stream: !done });
+        setPrReview((r) => r + chunk);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("❌ PR review failed");
+    } finally {
+      setReviewing(false);
+    }
+  };
+
   return (
     <div style={styles.page}>
       <div style={styles.container}>
@@ -199,6 +233,36 @@ export default function App() {
           {loading ? "Indexing repository…" : "Ingest Repo"}
         </button>
 
+        <div style={styles.divider} />
+
+        <div style={{ marginTop: 40 }}>
+          <h2>PR Review</h2>
+          <input
+            style={styles.input}
+            placeholder="GitHub PR URL"
+            value={prUrl}
+            onChange={(e) => setPrUrl(e.target.value)}
+            disabled={reviewing}
+          />
+          <button
+            style={{
+              ...styles.primaryBtn,
+              marginLeft: 10,
+              opacity: prUrl.trim() && !reviewing ? 1 : 0.5,
+              cursor: prUrl.trim() && !reviewing ? "pointer" : "not-allowed",
+            }}
+            onClick={reviewPR}
+            disabled={!prUrl.trim() || reviewing}
+          >
+            {reviewing ? "Reviewing…" : "Review PR"}
+          </button>
+
+          {prReview && (
+            <pre style={{ ...styles.botCode, marginTop: 10, whiteSpace: "pre-wrap" }}>
+              {prReview}
+            </pre>
+          )}
+        </div>
         <div style={styles.divider} />
 
         {/* Chat */}
