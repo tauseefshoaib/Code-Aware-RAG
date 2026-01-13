@@ -18,22 +18,21 @@ export async function streamPRReview(prUrl, res) {
   const [_, repoPath, prNumber] = match;
   const repoUrl = `https://github.com/${repoPath}.git`;
   const localPath = path.join("repos", repoPath.replace("/", "_"));
-  const git = simpleGit();
 
-  // 2️⃣ Clone or pull repo
-  if (fs.existsSync(localPath)) {
-    await git.cwd(localPath).pull();
-  } else {
+  // 2️⃣ Clone repo if needed
+  const git = simpleGit();
+  if (!fs.existsSync(localPath)) {
     await git.clone(repoUrl, localPath);
   }
 
-  // 3️⃣ Fetch PR branch and check it out
-  const prBranch = `pr/${prNumber}`;
-  await git.cwd(localPath).fetch("origin", `pull/${prNumber}/head:${prBranch}`);
-  await git.cwd(localPath).checkout(prBranch);
+   // 3️⃣ Fetch PR into a remote ref (no branch checkout)
+  const prRemoteRef = `refs/pull/${prNumber}/head`;
+  const prLocalRef = `refs/remotes/origin/pr/${prNumber}`;
 
-  // 4️⃣ Get diff against main branch
-  const diff = await git.diff(["main"]);
+  await git.cwd(localPath).fetch("origin", `${prRemoteRef}:${prLocalRef}`);
+
+  // 4️⃣ Get diff against main
+  const diff = await git.diff([`origin/main..origin/pr/${prNumber}`]);
 
   if (!diff) {
     res.end("No changes found in PR");
@@ -67,7 +66,7 @@ ${c.code}`
   const prompt = `
 You are a senior software engineer.
 Review the following Pull Request changes.
-Provide:
+Provide these along with the relevant code block diff:
 - Bugs
 - Security issues
 - Performance issues
